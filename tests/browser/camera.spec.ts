@@ -15,11 +15,14 @@ test('configure, connect, capture, reload, export, and remove a local snapshot',
   await expect(page.getByText('LIVE', { exact: true })).toBeVisible();
   await expect(page.getByTestId('live-frame').first()).toBeVisible();
   await page.screenshot({ path: '.context/plushycam-live-desktop.png', fullPage: true });
-  await page.getByRole('button', { name: 'Take snapshot', exact: true }).click();
+  await page.getByRole('button', { name: 'Save footage', exact: true }).click();
   await expect(page.getByText('Snapshot saved to your library.')).toBeVisible();
   await expect(page.getByText('LIVE', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Open library', exact: true }).click();
+  await page.getByRole('link', { name: 'Camera', exact: true }).click();
+  await expect(page.getByText('LIVE', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
-  await page.getByRole('button', { name: 'Open library', exact: true }).click();
+  await page.getByRole('link', { name: 'Open library', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Export image', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Export image', exact: true })).toBeVisible();
@@ -31,7 +34,7 @@ test('configure, connect, capture, reload, export, and remove a local snapshot',
   await page.screenshot({ path: '.context/plushycam-library-mobile.png', fullPage: true });
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
-  await expect(page.getByText('Room for your first moment')).toBeVisible();
+  await expect(page.getByText('No saved snapshots')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -58,7 +61,7 @@ test('browser bridge validates its target and streams the configured camera', as
   await page.getByRole('button', { name: 'Save camera', exact: true }).click();
   await page.getByRole('button', { name: 'Connect camera', exact: true }).click();
   await expect(page.getByText('LIVE', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Take snapshot', exact: true }).click();
+  await page.getByRole('button', { name: 'Save footage', exact: true }).click();
   await expect(page.getByText('Snapshot saved to your library.')).toBeVisible();
   await expect(page.getByText('LIVE', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();

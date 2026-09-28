@@ -19,6 +19,7 @@ export function createBridge(
       return;
     }
     if (browserOrigin) res.setHeader('Access-Control-Allow-Origin', browserOrigin);
+    res.setHeader('Access-Control-Expose-Headers', 'X-PlushyCam-Bridge-Error');
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Cache-Control', 'no-store');
@@ -65,8 +66,13 @@ export function createBridge(
       );
     } catch {
       if (!res.headersSent) {
-        res.writeHead(502);
-        res.end('Camera is unreachable. Verify its address and Wi-Fi.');
+        res.writeHead(502, {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'X-PlushyCam-Bridge-Error': 'camera-unreachable',
+        });
+        res.end(
+          'The local bridge cannot reach the camera. Check its address, Wi-Fi, and local-network permission for the app running the bridge.',
+        );
       } else res.destroy();
     } finally {
       clearTimeout(timeout);

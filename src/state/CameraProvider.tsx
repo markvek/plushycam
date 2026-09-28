@@ -28,6 +28,7 @@ function useCameraModel() {
   const [media, setMedia] = useState<SavedMedia[]>([]);
   const [ready, setReady] = useState(false);
   const [notice, setNotice] = useState<string>();
+  const [captureInfo, setCaptureInfo] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [checkingBridge, setCheckingBridge] = useState(false);
   const connectionRequest = useRef(0);
@@ -45,6 +46,7 @@ function useCameraModel() {
   const disconnect = useCallback(async () => {
     cancelPendingConnection();
     setCheckingBridge(false);
+    setCaptureInfo(undefined);
     await session.disconnect();
   }, [session, cancelPendingConnection]);
 
@@ -163,6 +165,7 @@ function useCameraModel() {
     if (!selected || saving) return;
     setSaving(true);
     setNotice(undefined);
+    setCaptureInfo(undefined);
     try {
       const bytes = await session.capture();
       await saveMedia(bytes, {
@@ -171,7 +174,7 @@ function useCameraModel() {
         cameraName: selected.nickname,
       });
       setMedia(await listMedia());
-      setNotice('Snapshot saved to your library.');
+      setCaptureInfo('Snapshot saved to your library.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not save snapshot.');
     } finally {
@@ -191,6 +194,7 @@ function useCameraModel() {
     media,
     ready,
     saving,
+    captureInfo,
     checkingBridge,
     notice,
     setNotice,

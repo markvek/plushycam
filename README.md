@@ -44,6 +44,8 @@ The original firmware does not send browser CORS headers. The bridge allows the 
 
 Optional bridge arguments: `--profile PROFILE_ID`, `--port 8787`, and `--app-origin http://localhost:OTHER_PORT`. If a future camera serves suitable CORS headers, the web app can connect without the bridge. HTTPS-hosted browser deployments also need a deliberately designed local-network strategy; this prototype is intended for local development.
 
+If the bridge returns **HTTP 502**, it could not connect to the camera. On macOS, an immediate **No route to host** error can indicate blocked local-network permission even when the camera is on the same subnet. Open **System Settings → Privacy & Security → Local Network** and enable the app running the bridge (for example, **Conductor**). Reconnect after changing the setting; restart the bridge if needed. Also verify the camera's current address and Wi-Fi. See [Apple's local-network permission guide](https://support.apple.com/guide/mac-help/mchla4f49138/mac).
+
 ### Try without hardware
 
 In a second terminal:

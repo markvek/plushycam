@@ -20,6 +20,30 @@ export function isJpeg(bytes: Uint8Array): boolean {
   );
 }
 
+/** Read frame dimensions from JPEG metadata without decoding the pixels. */
+export function jpegAspectRatio(bytes: Uint8Array): number | undefined {
+  if (!isJpeg(bytes)) return undefined;
+  let offset = 2;
+  while (offset + 3 < bytes.length) {
+    if (bytes[offset++] !== 0xff) return undefined;
+    while (bytes[offset] === 0xff) offset++;
+    const marker = bytes[offset++];
+    if (marker === 0xda || marker === 0xd9) return undefined;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    const length = (bytes[offset] << 8) | bytes[offset + 1];
+    if (length < 2 || offset + length > bytes.length) return undefined;
+    // SOF markers, excluding Huffman tables, JPEG extensions, and arithmetic tables.
+    if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
+      if (length < 8) return undefined;
+      const height = (bytes[offset + 3] << 8) | bytes[offset + 4];
+      const width = (bytes[offset + 5] << 8) | bytes[offset + 6];
+      return width > 0 && height > 0 ? width / height : undefined;
+    }
+    offset += length;
+  }
+  return undefined;
+}
+
 /** Bounded multipart parser. Supports length-delimited and boundary-delimited JPEG parts. */
 export class MjpegParser {
   private buffer = new Uint8Array(0);
