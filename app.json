@@ -5,17 +5,21 @@
     "scheme": "plushycam",
     "version": "0.1.0",
     "orientation": "default",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.plushycam.app",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "PlushyCam connects to your camera on Wi-Fi to show live video and save snapshots.",
-        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true }
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
-    "android": { "package": "com.plushycam.app" },
+    "android": {
+      "package": "com.plushycam.app"
+    },
     "web": {
       "bundler": "metro",
       "output": "single",
@@ -24,7 +28,15 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }]
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-font"
     ]
   }
 }

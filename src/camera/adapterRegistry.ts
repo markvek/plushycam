@@ -40,6 +40,14 @@ function createHttpMjpegAdapter(
       });
       if (!response.ok) {
         await response.body?.cancel();
+        if (
+          response.status === 502 &&
+          response.headers.get('x-plushycam-bridge-error') === 'camera-unreachable'
+        ) {
+          throw new Error(
+            'The local bridge cannot reach the camera. Check the camera address and Wi-Fi. On your Mac, enable Local Network access for the app running the bridge in System Settings → Privacy & Security → Local Network.',
+          );
+        }
         throw new Error(
           `Camera returned HTTP ${response.status}. Check whether another viewer is connected.`,
         );

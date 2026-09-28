@@ -1,9 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Image, Modal, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fromByteArray } from 'base64-js';
+import { jpegAspectRatio } from '../camera/mjpeg';
 import { router } from 'expo-router';
 import { useCamera } from '../state/CameraProvider';
-import { Button, CameraGlyph, Card, Loading, Pill, colors, s } from '../components/ui';
+import { Button, Loading, Pill, colors, s, tokens } from '../components/ui';
+import { AppIcon } from '../components/AppIcon';
+import { outline } from '../components/theme';
+import { AppBackground } from '../components/AppBackground';
+import { LoadingItem } from '../components/loading/LoadingItem';
 
 export default function CameraScreen() {
   const {
@@ -15,14 +20,17 @@ export default function CameraScreen() {
     disconnect,
     capture,
     saving,
+    captureInfo,
     checkingBridge,
-    media,
     setNotice,
   } = useCamera();
   const [fullscreen, setFullscreen] = useState(false);
   const [decodeFailed, setDecodeFailed] = useState(false);
-  const { width } = useWindowDimensions();
-  const wide = width >= 900;
+  // Web image-load events omit source dimensions; read the JPEG header instead.
+  const frameAspectRatio = useMemo(
+    () => (state.frame ? jpegAspectRatio(state.frame.bytes) : undefined) ?? 4 / 3,
+    [state.frame],
+  );
   const uri = useMemo(
     () => (state.frame ? `data:image/jpeg;base64,${fromByteArray(state.frame.bytes)}` : undefined),
     [state.frame],
@@ -37,63 +45,29 @@ export default function CameraScreen() {
   };
   if (!ready) return <Loading />;
 
-  const preview = (large = false) => (
-    <View
-      style={{
-        backgroundColor: '#050A0D',
-        borderRadius: large ? 0 : 16,
-        overflow: 'hidden',
-        aspectRatio: 16 / 10,
-        width: '100%',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: colors.border,
-      }}
-    >
-      {uri ? (
-        <Image
-          testID="live-frame"
-          accessibilityLabel="Live camera frame"
-          source={{ uri }}
-          resizeMode="contain"
-          onLoad={() => setDecodeFailed(false)}
-          onError={() => {
-            setDecodeFailed(true);
-            setNotice('The camera frame could not be displayed. Check the firmware image format.');
-          }}
-          style={{ position: 'absolute', width: '100%', height: '100%', opacity: active ? 1 : 0.3 }}
-        />
-      ) : (
-        <View style={{ alignItems: 'center', gap: 24 }}>
-          <View
-            style={{
-              padding: 35,
-              borderWidth: 1,
-              borderColor: '#233B3C',
-              borderRadius: 100,
-              backgroundColor: '#101F22',
-            }}
-          >
-            <CameraGlyph size={60} />
-          </View>
-          <Text style={{ color: colors.text, fontSize: 19 }}>
-            {selected ? 'Your next view is one tap away' : 'A new point of view starts here'}
-          </Text>
-          <Text style={[s.small, { textAlign: 'center', maxWidth: 260 }]}>
-            {selected
-              ? 'Connect your camera to bring it into focus.'
-              : 'Add your camera to see what it sees.'}
-          </Text>
+  const preview = () => (
+    <View style={[outline, { overflow: 'hidden', backgroundColor: colors.panel, width: '100%' }]}>
+      <View
+        style={[
+          s.spread,
+          {
+            backgroundColor: colors.raised,
+            padding: 12,
+            borderBottomWidth: tokens.border,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={[s.row, { gap: 8 }]}>
+          <AppIcon name="camera" />
+          <Text style={s.label}>Live view</Text>
         </View>
-      )}
-      <View style={{ position: 'absolute', left: 16, top: 16 }}>
         <Pill
           text={
             active
               ? 'LIVE'
               : state.snapshot === 'capturing'
-                ? 'TAKING SNAPSHOT'
+                ? 'SAVING'
                 : pending
                   ? 'CONNECTING'
                   : 'OFFLINE'
@@ -101,191 +75,159 @@ export default function CameraScreen() {
           active={active}
         />
       </View>
-      <View style={{ position: 'absolute', right: 16, top: 18 }}>
-        <Text style={[s.small, { color: '#B2C6CB' }]}>PLUSHYCAM / 01</Text>
+      <View
+        testID="live-container"
+        style={{
+          backgroundColor: uri ? colors.ink : colors.bg,
+          minHeight: uri ? undefined : 280,
+          aspectRatio: uri ? frameAspectRatio : undefined,
+          width: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: uri ? 0 : 50,
+          overflow: 'hidden',
+        }}
+      >
+        {!uri && <AppBackground style={StyleSheet.absoluteFill}>{null}</AppBackground>}
+        {uri ? (
+          <Image
+            testID="live-frame"
+            accessibilityLabel="Live camera frame"
+            source={{ uri }}
+            resizeMode="contain"
+            onLoad={() => setDecodeFailed(false)}
+            onError={() => {
+              setDecodeFailed(true);
+              setNotice(
+                'The camera frame could not be displayed. Check the firmware image format.',
+              );
+            }}
+            style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              opacity: active ? 1 : 0.3,
+            }}
+          />
+        ) : (
+          <View style={{ alignItems: 'center', gap: 16, paddingHorizontal: 20 }}>
+            <LoadingItem size={176} />
+            <Text
+              style={[
+                s.heading,
+                s.onBackground,
+                { fontFamily: tokens.font.title, fontWeight: 'normal', textAlign: 'center' },
+              ]}
+            >
+              {pending ? 'Connecting…' : selected ? 'Camera disconnected' : 'No camera selected'}
+            </Text>
+          </View>
+        )}
+        {state.live === 'stalled' && (
+          <View style={[s.alert, { position: 'absolute', bottom: 12, left: 12, right: 12 }]}>
+            <Text style={s.text}>Feed interrupted · retry {state.attempt}</Text>
+            <Text style={s.small}>
+              {state.frame
+                ? `Last frame received at ${new Date(state.frame.receivedAt).toLocaleTimeString()}`
+                : 'Waiting for the first frame'}
+            </Text>
+          </View>
+        )}
       </View>
-      {state.live === 'stalled' && (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 18,
-            left: 18,
-            right: 18,
-            backgroundColor: '#19272DEE',
-            padding: 12,
-            borderRadius: 8,
-          }}
-        >
-          <Text style={s.text}>Feed interrupted · retry {state.attempt}</Text>
-          <Text style={s.small}>
-            {state.frame
-              ? `Last frame received at ${new Date(state.frame.receivedAt).toLocaleTimeString()}`
-              : 'Waiting for the first frame'}
-          </Text>
-        </View>
-      )}
     </View>
   );
 
   return (
     <View style={s.page}>
+      <Text accessibilityRole="header" style={s.title}>
+        Camera
+      </Text>
+      {preview()}
       <View style={s.spread}>
-        <View style={{ gap: 10 }}>
-          <Text style={[s.label, { color: colors.mint }]}>YOUR EVERYDAY VIEW</Text>
-          <Text style={s.title}>
-            {selected ? 'Let’s see what’s out there.' : 'A little camera. A bigger view.'}
-          </Text>
-          <Text style={s.subtitle}>Connect locally. Stay in the moment. Keep what matters.</Text>
-        </View>
-        <Pill text={selected ? 'CAMERA CONFIGURED' : 'LET’S GET CONNECTED'} />
-      </View>
-      <View style={{ flexDirection: wide ? 'row' : 'column', gap: 24, alignItems: 'stretch' }}>
-        <View style={{ flex: wide ? 2.25 : undefined, gap: 18 }}>
-          {preview()}
-          <View style={s.spread}>
-            <View style={{ gap: 5 }}>
-              <Text style={s.heading}>{selected?.nickname ?? 'Your camera, right here'}</Text>
-              <Text style={s.small}>
-                {profile
-                  ? `${profile.brand} · ${profile.model}`
-                  : 'Ready for your first connection'}
-              </Text>
-            </View>
-            <View style={s.row}>
-              {selected && profile ? (
-                <>
-                  <Button
-                    title={
-                      checkingBridge
-                        ? 'Cancel connection'
-                        : state.connection === 'disconnected'
-                          ? 'Connect camera'
-                          : 'Disconnect'
-                    }
-                    onPress={() =>
-                      handle(
-                        state.connection === 'disconnected' && !checkingBridge
-                          ? connect
-                          : disconnect,
-                      )
-                    }
-                    secondary={state.connection !== 'disconnected'}
-                  />
-                  <Button title="Expand view" onPress={() => setFullscreen(true)} secondary />
-                </>
-              ) : (
-                <Button title="Add your camera" onPress={() => router.push('/settings')} />
-              )}
-            </View>
+        {selected && (
+          <View style={{ gap: 4, flexShrink: 1 }}>
+            <Text style={[s.heading, s.onBackground]}>{selected.nickname}</Text>
+            <Text style={[s.small, s.mutedOnBackground]}>
+              {profile?.model ?? 'Camera'} · {selected.host}
+            </Text>
           </View>
-          {state.error && (
-            <Text accessibilityRole="alert" style={[s.small, { color: colors.danger }]}>
-              {state.error}
-            </Text>
-          )}
-        </View>
-        <View style={{ flex: wide ? 1 : undefined, gap: 18 }}>
-          <Card>
-            <Text style={s.label}>CAMERA CONNECTION</Text>
-            <View style={s.spread}>
-              <CameraGlyph size={36} />
-              <Pill text={active ? 'Connected' : 'Not connected'} active={active} />
-            </View>
-            <Text style={s.heading}>{profile?.model ?? 'Make it yours'}</Text>
-            <Text style={s.subtitle}>
-              {selected
-                ? 'A direct link to your camera, over your local network.'
-                : 'Choose your camera model, add its address, and you’re ready to look around.'}
-            </Text>
-            <View style={{ height: 1, backgroundColor: colors.border }} />
-            <View style={s.spread}>
-              <Text style={s.small}>Connection</Text>
-              <Text style={s.text}>Local Wi-Fi</Text>
-            </View>
-            <View style={s.spread}>
-              <Text style={s.small}>Address</Text>
-              <Text style={s.text}>{selected?.host ?? 'Not configured'}</Text>
-            </View>
-            <Button
-              title={selected ? 'Manage cameras' : 'Set up a camera'}
-              secondary
-              onPress={() => router.push('/settings')}
-            />
-          </Card>
-          {(!profile || profile.capabilities.snapshot) && (
-            <Card style={{ backgroundColor: '#18352B', borderColor: '#305443' }}>
-              <Text style={[s.label, { color: colors.mint }]}>KEEP A LITTLE MOMENT</Text>
-              <Text style={s.heading}>See something worth saving?</Text>
-              <Text style={s.subtitle}>Take a snapshot and keep it in your own library.</Text>
+        )}
+        <View style={s.row}>
+          {selected && profile ? (
+            <>
               <Button
-                title={saving ? 'Saving snapshot…' : 'Take snapshot'}
-                disabled={!active || saving || !profile?.capabilities.snapshot}
-                onPress={() => {
-                  void capture();
-                }}
+                icon={
+                  state.connection === 'disconnected' && !checkingBridge ? 'connect' : 'disconnect'
+                }
+                title={
+                  checkingBridge
+                    ? 'Cancel connection'
+                    : state.connection === 'disconnected'
+                      ? 'Connect camera'
+                      : 'Disconnect'
+                }
+                onPress={() =>
+                  handle(
+                    state.connection === 'disconnected' && !checkingBridge ? connect : disconnect,
+                  )
+                }
+                secondary={state.connection !== 'disconnected'}
               />
-              {saving && <Text style={s.small}>Live view briefly pauses for your snapshot.</Text>}
-            </Card>
+              <Button
+                icon="expand"
+                title="Expand view"
+                onPress={() => setFullscreen(true)}
+                secondary
+              />
+            </>
+          ) : (
+            <Button icon="add" title="Add your camera" onPress={() => router.push('/settings')} />
+          )}
+          {(!profile || profile.capabilities.snapshot) && (
+            <Button
+              icon="camera"
+              title={saving ? 'Saving footage…' : 'Save footage'}
+              disabled={!active || saving || !profile?.capabilities.snapshot}
+              onPress={() => {
+                void capture();
+              }}
+            />
           )}
         </View>
       </View>
-      <View style={s.spread}>
-        <View style={{ gap: 6 }}>
-          <Text style={s.heading}>Your recent moments</Text>
-          <Text style={s.small}>
-            {media.length
-              ? `${media.length} saved ${media.length === 1 ? 'snapshot' : 'snapshots'}`
-              : 'Your snapshots will feel right at home here.'}
-          </Text>
-        </View>
-        <Button title="Open library" secondary onPress={() => router.push('/saved')} />
-      </View>
-      {media.length > 0 ? (
-        <View style={[s.row, { alignItems: 'stretch' }]}>
-          {media.slice(0, 3).map((item) => (
-            <View key={item.id} style={{ flex: 1, minWidth: 180, gap: 9 }}>
-              <Image
-                source={{ uri: item.uri }}
-                style={{ width: '100%', aspectRatio: 1.7, borderRadius: 12 }}
-              />
-              <Text style={s.small}>
-                {item.cameraName} ·{' '}
-                {new Date(item.savedAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : (
+      {saving && (
+        <Text style={[s.small, s.mutedOnBackground]}>
+          Live view briefly pauses while saving.
+        </Text>
+      )}
+      {captureInfo && (
         <View
+          testID="footage-info"
+          accessibilityLiveRegion="polite"
           style={{
-            borderWidth: 1,
-            borderStyle: 'dashed',
-            borderColor: colors.border,
-            borderRadius: 16,
-            padding: 28,
+            paddingVertical: 12,
+            borderTopWidth: tokens.border,
+            borderColor: colors.mutedOnBackground,
           }}
         >
-          <Text style={[s.small, { textAlign: 'center' }]}>
-            No snapshots yet. Connect your camera and capture your first moment.
-          </Text>
+          <Text style={[s.small, s.onBackground]}>{captureInfo}</Text>
         </View>
       )}
+      {state.error && (
+        <Text accessibilityRole="alert" style={[s.text, s.alert]}>
+          {state.error}
+        </Text>
+      )}
       <Modal visible={fullscreen} animationType="fade" onRequestClose={() => setFullscreen(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: colors.bg,
-            justifyContent: 'center',
-            padding: 20,
-            gap: 20,
-          }}
-        >
-          {preview(true)}
-          <Button title="Close expanded view" onPress={() => setFullscreen(false)} />
-        </View>
+        <AppBackground style={{ padding: 20, gap: 20 }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          >
+            {preview()}
+          </ScrollView>
+          <Button icon="close" title="Close expanded view" onPress={() => setFullscreen(false)} />
+        </AppBackground>
       </Modal>
     </View>
   );

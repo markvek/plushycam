@@ -1,6 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MjpegParser } from '../src/camera/mjpeg';
+import jpeg from 'jpeg-js';
+import { jpegAspectRatio, MjpegParser } from '../src/camera/mjpeg';
+
+test('reads landscape and portrait aspect ratios from encoded camera frames', () => {
+  for (const [width, height] of [[24, 16], [12, 20]]) {
+    const { data } = jpeg.encode({ width, height, data: Buffer.alloc(width * height * 4) }, 65);
+    assert.equal(jpegAspectRatio(data), width / height);
+    assert.equal(jpegAspectRatio(data.subarray(0, 20)), undefined);
+  }
+});
+
+test('invalid JPEG metadata safely falls back without reading pixel data', () => {
+  for (const bytes of [
+    [],
+    [0xff, 0xd8, 0xff, 0xe0, 0, 0, 0xff, 0xd9],
+    [0xff, 0xd8, 0xff, 0xc0, 0, 8, 8, 0, 0, 0, 0, 0, 0xff, 0xd9],
+    [0xff, 0xd8, 0xff, 0xda, 0, 2, 0xff, 0xc0, 0xff, 0xd9],
+  ]) {
+    assert.equal(jpegAspectRatio(Uint8Array.from(bytes)), undefined);
+  }
+});
 
 const image = Uint8Array.from([255, 216, 1, 2, 3, 255, 217]);
 function part(length = true) {
